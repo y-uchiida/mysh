@@ -5,6 +5,6 @@
 
 ----
 
-I implement shell program for school subject, and I need to study lexer and parser.
+I implement shell program for school subject, and I need to study lexer and parser.  
 So I read sources in parent repository with adding comments in Japanese.  
 Thanks Mr. Swoorup Joshi, provider of this great product.
