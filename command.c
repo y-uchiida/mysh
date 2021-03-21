@@ -8,10 +8,11 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-char* prompt = NULL;
+char* prompt = NULL; /* 入力待ち受け時に表示する文字列の領域のポインタ */
 bool signalset = false;
 void   (*SIGINT_handler)(int);
 
+/* 受け取った文字列をpromptに代入して、画面上に表示する準備をする */
 void set_prompt(char* str)
 {
     if (prompt != NULL)
@@ -26,14 +27,16 @@ char* getprompt()
 	return prompt;
 }
 
-void ignore_signal_for_shell()
+void ignore_signal_for_shell() /* シェル自身に対するシグナルハンドラを設定 */
 {
 	signalset = true;
 	
 	// ignore "Ctrl-C"
     SIGINT_handler = signal(SIGINT, SIG_IGN);
+
 	// ignore "Ctrl-Z"
     signal(SIGTSTP, SIG_IGN);
+
 	// ignore "Ctrl-\"
     signal(SIGQUIT, SIG_IGN);
 }
@@ -232,6 +235,7 @@ void execute_command_internal(CommandInternal* cmdinternal)
     return;
 }
 
+/* コマンド情報を初期化？ */
 int init_command_internal(ASTreeNode* simplecmdNode,
                           CommandInternal* cmdinternal,
                           bool async,
@@ -281,6 +285,7 @@ int init_command_internal(ASTreeNode* simplecmdNode,
     return 0;
 }
 
+/* 入力コマンド情報を破棄・解放(free)する */
 void destroy_command_internal(CommandInternal* cmdinternal)
 {
     int i;

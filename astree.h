@@ -13,13 +13,16 @@ typedef enum {
     NODE_DATA 			= (1 << 7),
 } NodeType;
 
+/*
+** AST: abstract syntax tree(抽象構文木)
+** 単純な二分木構造を定義している
+*/
 typedef struct ASTreeNode
 {
-    int type;
-    char* szData;
-    struct ASTreeNode* left;
-    struct ASTreeNode* right;
-
+    int type; /* たぶん、NodeTypeを入れるんだと思う */
+    char* szData; /* サイズデータ？分からん…実際のテキストかな… */
+    struct ASTreeNode* left; /* 左の枝へのポインタ */
+    struct ASTreeNode* right; /* 右の枝へのポインタ */
 } ASTreeNode;
 
 #define NODETYPE(a) (a & (~NODE_DATA))	// get the type of the nodes

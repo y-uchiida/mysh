@@ -1,7 +1,8 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-enum TokenType{
+enum TokenType /* 入力されたコマンドのtokenを種類分けしている…PIPEなど特殊な動作をする文字を独立させている */
+{
 	CHAR_GENERAL = -1,
 	CHAR_PIPE = '|',
 	CHAR_AMPERSAND = '&',
@@ -19,25 +20,27 @@ enum TokenType{
 	TOKEN	= -1,
 };
 
-enum {
-	STATE_IN_DQUOTE,
-	STATE_IN_QUOTE,
+enum
+{ /* 入力状況の状態管理？クオートの入力待ちとか、エスケープ処理中とか… */
+	STATE_IN_DQUOTE, /* ダブルクオート文字列の中にいる状態 */
+	STATE_IN_QUOTE, /* シングルクオート文字列の中にいる状態 */
 	
-	STATE_IN_ESCAPESEQ,
-	STATE_GENERAL,
+	STATE_IN_ESCAPESEQ, /* エスケープ文字が入力された状態 */
+	STATE_GENERAL, /* 通常の状態 */
 };
 
 typedef struct tok tok_t;
 typedef struct lexer lexer_t;
 
-struct tok {
+struct tok
+{ /* 入力されたコマンドを解析した結果、tokenの一覧として連結リストにしている */
 	char* data;
 	int type;
 	tok_t* next;
 };
 
 struct lexer
-{
+{ /* tokenの連結リストと、、、ntoksってなんだろう… number of tokens (tokenの数)と予想 */
 	tok_t* llisttok;
 	int ntoks;
 };
