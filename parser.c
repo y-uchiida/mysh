@@ -156,20 +156,21 @@ tok_t* curtok = NULL;
 
 /*
 ** term():
-** curtok(現在解析中のtoken)のtokentypeを判定する
-** curtoe->typeと引数で与えられたtokentypeと一致すればtrueを返し、
-** そうでなければfalseを返す。
-** trueの場合にbufferptrが与えられていれば、bufferptrにcurtokの値を複製する
-** falseの場合は、終了時にcurtokをひとつ先に進める
+** curtok(現在解析中のtoken)のメンバ変数 typeが、引数で与えられた tokentypeと一致するかを判定する。
+** curtoe->typeと引数で与えられたtokentypeと一致すればtrueを返し、そうでなければfalseを返す。
+** 引数で与えられるtokentypeは、lexer.hで宣言されている enum TokenType で指定される。
+** 判定結果がtrueの場合にbufferptrが与えられていれば、bufferptrにcurtokの値を複製する。
+** (後で再帰的にASTに追加する際に必要になるので)
+** tokenの値を順次確認していくため、検査終了時にcurtokの値をnextに更新する。
 */
 bool term(int toketype, char** bufferptr)
 {
-	if (curtok == NULL)
-		return false;
+	if (curtok == NULL) /* curtokはNULL以外のものでなければならない */
+		return false; 
 	
     if (curtok->type == toketype)
     {
-		if (bufferptr != NULL) {
+		if (bufferptr != NULL) { /* ASTに再帰的に登録できるように、bufferptrに内容を複製しておく */
 			*bufferptr = malloc(strlen(curtok->data) + 1);
 			strcpy(*bufferptr, curtok->data);
 		}
@@ -196,19 +197,19 @@ ASTreeNode *CMDLINE()
 
     ASTreeNode *node; /* 抽象構文木の要素となるポインタを宣言 */
 
-    if ((curtok = save, node = CMDLINE1()) != NULL)
+    if ((curtok = save, node = CMDLINE1()) != NULL) //	<job> ';' <command line>
+        return node; /* 条件に一致していた場合、nodeを返す */
+
+    if ((curtok = save /* ポインタを戻す */, node = CMDLINE2()) != NULL) //	<job> ';'
         return node;
 
-    if ((curtok = save, node = CMDLINE2()) != NULL)
+    if ((curtok = save /* ポインタを戻す */, node = CMDLINE3()) != NULL) //	<job> '&' <command line>
         return node;
 
-    if ((curtok = save, node = CMDLINE3()) != NULL)
+    if ((curtok = save /* ポインタを戻す */, node = CMDLINE4()) != NULL) //	<job> '&'
         return node;
 
-    if ((curtok = save, node = CMDLINE4()) != NULL)
-        return node;
-
-    if ((curtok = save, node = CMDLINE5()) != NULL)
+    if ((curtok = save /* ポインタを戻す */, node = CMDLINE5()) != NULL) //	<job>
         return node;
 
     /* どれにも当てはまらなかったら、NULLを返す(終端ってことかな…) */
@@ -226,22 +227,23 @@ ASTreeNode* CMDLINE1()
     ASTreeNode* cmdlineNode;
     ASTreeNode* result;
 
-    if ((jobNode = JOB()) == NULL)
+    if ((jobNode = JOB()) == NULL) // <job> に合致するか判定
         return NULL;
 
-    if (!term(CHAR_SEMICOLON, NULL)) {
+    if (!term(CHAR_SEMICOLON, NULL)) { // ';' に合致するか判定
+        ASTreeNodeDelete(jobNode); // ';' でない場合、直前にASTに追加したjobNodeを削除
+        return NULL;
+    }
+
+    if ((cmdlineNode = CMDLINE()) == NULL) { // <command line> でない場合、直前にASTに追加したjobNodeを削除
         ASTreeNodeDelete(jobNode);
         return NULL;
     }
 
-    if ((cmdlineNode = CMDLINE()) == NULL) {
-        ASTreeNodeDelete(jobNode);
-        return NULL;
-    }
-
-    result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_SEQ);
-    ASTreeAttachBinaryBranch(result, jobNode, cmdlineNode);
+    /* 以下、<job> ; <command line> に合致する場合の処理 */
+    result = malloc(sizeof(*result)); /* ASTreeNode のポインタをメモリ確保 */
+    ASTreeNodeSetType(result, NODE_SEQ); /* jobの完了後に残りのcommandlineの処理に入ることがわかるようにしておく...sequence？ */
+    ASTreeAttachBinaryBranch(result, jobNode, cmdlineNode); /* [left: jobNode] --- [root: result(NODE_SEQ)] --- [right: cmdlineNode] */
 
     return result;
 }
@@ -265,7 +267,7 @@ ASTreeNode* CMDLINE2()
     }
 
     result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_SEQ);
+    ASTreeNodeSetType(result, NODE_SEQ); /* jobの完了後に残りのcommandlineの処理に入ることがわかるようにしておく...sequence？ */
     ASTreeAttachBinaryBranch(result, jobNode, NULL);
 
     return result;
@@ -296,7 +298,7 @@ ASTreeNode* CMDLINE3()
     }
 
     result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_BCKGRND);
+    ASTreeNodeSetType(result, NODE_BCKGRND); /* バックグラウンド実行するジョブであることがわかるようにしておく */
     ASTreeAttachBinaryBranch(result, jobNode, cmdlineNode);
 
     return result;
@@ -321,7 +323,7 @@ ASTreeNode* CMDLINE4()
     }
 
     result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_BCKGRND);
+    ASTreeNodeSetType(result, NODE_BCKGRND); /* バックグラウンド実行するジョブであることがわかるようにしておく */
     ASTreeAttachBinaryBranch(result, jobNode, NULL);
 
     return result;
@@ -344,14 +346,19 @@ ASTreeNode* CMDLINE5()
 */
 ASTreeNode* JOB()
 {
+    /*
+    ** 処理中のtokenのポインタをいったん保存する
+    ** 解析のコマンドでcurtokを先に進めてしまうので、
+    ** 元の位置に戻れるようにするためだと思われる
+    */
     tok_t* save = curtok;
 
     ASTreeNode* node;
 
-    if ((curtok = save, node = JOB1()) != NULL)
+    if ((curtok = save, node = JOB1()) != NULL) // <command> '|' <job>
         return node;
 
-    if ((curtok = save, node = JOB2()) != NULL)
+    if ((curtok = save, node = JOB2()) != NULL) // <command>
         return node;
 
     return NULL;
@@ -404,17 +411,22 @@ ASTreeNode* JOB2()
 */
 ASTreeNode* CMD()
 {
+    /*
+    ** 処理中のtokenのポインタをいったん保存する
+    ** 解析のコマンドでcurtokを先に進めてしまうので、
+    ** 元の位置に戻れるようにするためだと思われる
+    */
     tok_t* save = curtok;
 
     ASTreeNode* node;
 
-    if ((curtok = save, node = CMD1()) != NULL)
+    if ((curtok = save, node = CMD1()) != NULL) //	<simple command> '<' <filename>
         return node;
 
-    if ((curtok = save, node = CMD2()) != NULL)
+    if ((curtok = save, node = CMD2()) != NULL) //	<simple command> '>' <filename>
         return node;
 
-    if ((curtok = save, node = CMD3()) != NULL)
+    if ((curtok = save, node = CMD3()) != NULL) //	<simple command>
         return node;
 
     return NULL;
@@ -446,7 +458,7 @@ ASTreeNode* CMD1()
     }
 
     result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_REDIRECT_IN);
+    ASTreeNodeSetType(result, NODE_REDIRECT_IN); /* filename からの入力を受け取るコマンドであることがわかるようにしておく */
     ASTreeNodeSetData(result, filename);
     ASTreeAttachBinaryBranch(result, NULL, simplecmdNode);
 
@@ -479,7 +491,7 @@ ASTreeNode* CMD2()
 	}
 
     result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_REDIRECT_OUT);
+    ASTreeNodeSetType(result, NODE_REDIRECT_OUT); /* filename への出力を行うことがわかるようにしておく */
     ASTreeNodeSetData(result, filename);
 	ASTreeAttachBinaryBranch(result, NULL, simplecmdNode);
 
@@ -502,8 +514,14 @@ ASTreeNode* CMD3()
 */
 ASTreeNode* SIMPLECMD()
 {
+    /*
+    ** 処理中のtokenのポインタをいったん保存する
+    ** 解析のコマンドでcurtokを先に進めてしまうので、
+    ** 元の位置に戻れるようにするためだと思われる
+    */
     tok_t* save = curtok;
-    return SIMPLECMD1();
+
+    return SIMPLECMD1(); // <pathname> <token list>
 }
 
 /*
@@ -524,7 +542,7 @@ ASTreeNode* SIMPLECMD1()
     // we don't check whether tokenlistNode is NULL since its a valid grammer
 
     result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_CMDPATH);
+    ASTreeNodeSetType(result, NODE_CMDPATH); /* 実行ファイルへのパスだとわかるようにしておく */
     ASTreeNodeSetData(result, pathname);
 	ASTreeAttachBinaryBranch(result, NULL, tokenListNode);
 
@@ -537,14 +555,19 @@ ASTreeNode* SIMPLECMD1()
 */
 ASTreeNode* TOKENLIST()
 {
+    /*
+    ** 処理中のtokenのポインタをいったん保存する
+    ** 解析のコマンドでcurtokを先に進めてしまうので、
+    ** 元の位置に戻れるようにするためだと思われる
+    */
     tok_t* save = curtok;
 
     ASTreeNode* node;
 
-    if ((curtok = save, node = TOKENLIST1()) != NULL)
+    if ((curtok = save, node = TOKENLIST1()) != NULL) //	<token> <token list>
         return node;
 
-    if ((curtok = save, node = TOKENLIST2()) != NULL)
+    if ((curtok = save, node = TOKENLIST2()) != NULL) //	EMPTY
         return node;
 
     return NULL;
@@ -569,7 +592,7 @@ ASTreeNode* TOKENLIST1()
     /* tokenListNodeがNULLである場合も有効な文法であるため、エラーとしてチェックしない */
 
     result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_ARGUMENT);
+    ASTreeNodeSetType(result, NODE_ARGUMENT); /* 単独の引数としてノードタイプを設定 */
     ASTreeNodeSetData(result, arg);
 	ASTreeAttachBinaryBranch(result, NULL, tokenListNode);
 
