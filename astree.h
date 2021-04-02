@@ -2,15 +2,15 @@
 #define ASTREE_H
 
 typedef enum {
-    NODE_PIPE 			= (1 << 0),
-    NODE_BCKGRND 		= (1 << 1),
-    NODE_SEQ 			= (1 << 2),
-    NODE_REDIRECT_IN 	= (1 << 3),
-    NODE_REDIRECT_OUT 	= (1 << 4),
-    NODE_CMDPATH		= (1 << 5),
-    NODE_ARGUMENT		= (1 << 6),
+    NODE_PIPE 			= (1 << 0), /* パイプ ( '|' ) */
+    NODE_BCKGRND 		= (1 << 1), /* バックグラウンド実行する ( '&' ) */ 
+    NODE_SEQ 			= (1 << 2), /* 実行完了後に残りの処理に入る ( ';' ) */
+    NODE_REDIRECT_IN 	= (1 << 3), /* 入力受け取りリダイレクト ( '<' ) */
+    NODE_REDIRECT_OUT 	= (1 << 4), /* 出力先指定リダイレクト ( '>' ) */
+    NODE_CMDPATH		= (1 << 5), /* 実行ファイルのパス(コマンド名) */
+    NODE_ARGUMENT		= (1 << 6), /* 単独の引数 */
 
-    NODE_DATA 			= (1 << 7),
+    NODE_DATA 			= (1 << 7), /* 制御文字ではなく、文字列データ(token)を持つことを示す */
 } NodeType;
 
 /*
@@ -19,12 +19,16 @@ typedef enum {
 */
 typedef struct ASTreeNode
 {
-    int type; /* たぶん、NodeTypeを入れるんだと思う */
-    char* szData; /* サイズデータ？分からん…実際のテキストかな… */
+    int type; /* enum NodeType */
+    char* szData; /* パースした結果のトークン文字列...szDataがどんな意味かは不明 */
     struct ASTreeNode* left; /* 左の枝へのポインタ */
     struct ASTreeNode* right; /* 右の枝へのポインタ */
 } ASTreeNode;
 
+/*
+** NODETYPE(a):
+** a の
+*/
 #define NODETYPE(a) (a & (~NODE_DATA))	// get the type of the nodes
 
 void ASTreeAttachBinaryBranch (ASTreeNode * root , ASTreeNode * leftNode , ASTreeNode * rightNode);
