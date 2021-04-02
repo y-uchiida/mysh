@@ -184,14 +184,15 @@ bool term(int toketype, char** bufferptr)
 
 /*
 ** CMDLINE():
-** すべてのコマンドライン生成物を順番に検証する
+** parse()から呼び出される、構文解析の再帰処理の根元になる関数
+** <cmdline>の構文パターンを順番に検証する
 */
 ASTreeNode *CMDLINE()
 {
     /*
     ** 処理中のtokenのポインタをいったん保存する
     ** 解析のコマンドでcurtokを先に進めてしまうので、
-    ** 元の位置に戻れるようにするためだと思われる
+    ** 元の位置に戻れるようにするためにポインタを保持しておく
     */
     tok_t *save = curtok; 
 
@@ -268,7 +269,7 @@ ASTreeNode* CMDLINE2()
 
     result = malloc(sizeof(*result));
     ASTreeNodeSetType(result, NODE_SEQ); /* jobの完了後に残りのcommandlineの処理に入ることがわかるようにしておく...sequence？ */
-    ASTreeAttachBinaryBranch(result, jobNode, NULL);
+    ASTreeAttachBinaryBranch(result, jobNode, NULL); /* [left: jobNode] --- [root: result(NODE_SEQ)] --- [right: NULL] */
 
     return result;
 }
@@ -299,7 +300,7 @@ ASTreeNode* CMDLINE3()
 
     result = malloc(sizeof(*result));
     ASTreeNodeSetType(result, NODE_BCKGRND); /* バックグラウンド実行するジョブであることがわかるようにしておく */
-    ASTreeAttachBinaryBranch(result, jobNode, cmdlineNode);
+    ASTreeAttachBinaryBranch(result, jobNode, cmdlineNode); /* [left: jobNode] --- [root: result(NODE_BCKGRND)] --- [right: cmdlineNode] */
 
     return result;
 }
@@ -324,7 +325,7 @@ ASTreeNode* CMDLINE4()
 
     result = malloc(sizeof(*result));
     ASTreeNodeSetType(result, NODE_BCKGRND); /* バックグラウンド実行するジョブであることがわかるようにしておく */
-    ASTreeAttachBinaryBranch(result, jobNode, NULL);
+    ASTreeAttachBinaryBranch(result, jobNode, NULL); /* [left: jobNode] --- [root: result(NODE_SEQ)] --- [right: NULL] */
 
     return result;
 }
@@ -336,32 +337,33 @@ ASTreeNode* CMDLINE4()
 */
 ASTreeNode* CMDLINE5()
 {
+    /* 残っているtokenが<job> に当てはまるかどうか…これに合致しなければNULL */
     return JOB();
 }
 
 /*
 ** JOB():
-** すべてジョブの生成物を順番に検証する
-** <job>
+** CMDLINE の検証を行う関数から呼び出される
+** <job>の構文パターンを順番に検証する
 */
 ASTreeNode* JOB()
 {
     /*
     ** 処理中のtokenのポインタをいったん保存する
     ** 解析のコマンドでcurtokを先に進めてしまうので、
-    ** 元の位置に戻れるようにするためだと思われる
+    ** 元の位置に戻れるようにするためにポインタを保持しておく
     */
     tok_t* save = curtok;
 
     ASTreeNode* node;
 
-    if ((curtok = save, node = JOB1()) != NULL) // <command> '|' <job>
+    if ((curtok = save /* ポインタを戻す */, node = JOB1()) != NULL) // <command> '|' <job>
         return node;
 
-    if ((curtok = save, node = JOB2()) != NULL) // <command>
+    if ((curtok = save /* ポインタを戻す */, node = JOB2()) != NULL) // <command>
         return node;
 
-    return NULL;
+    return NULL; //<job> の構文パターンのどちらにも当てはまらない場合、NULLを返す
 }
 
 /*
@@ -389,8 +391,8 @@ ASTreeNode* JOB1()
     }
 
     result = malloc(sizeof(*result));
-    ASTreeNodeSetType(result, NODE_PIPE);
-    ASTreeAttachBinaryBranch(result, cmdNode, jobNode);
+    ASTreeNodeSetType(result, NODE_PIPE); /* パイプにより分割されていることがわかるように、nodetypeを NODE_PIPE に設定する */
+    ASTreeAttachBinaryBranch(result, cmdNode, jobNode); /* [left: cmdNode] --- [root: result(NODE_PIPE)] --- [right: jobNode] */
 
     return result;
 }
@@ -402,31 +404,33 @@ ASTreeNode* JOB1()
 */
 ASTreeNode* JOB2()
 {
+    /* 残っているtokenが<command> に当てはまるかどうか…これに合致しなければNULL */
     return CMD();
 }
 
 /*
 ** CMD():
-** すべてコマンド生成物を順番に検証する
+** JOB の検証を行う関数から呼び出される
+** <cmd>の構文パターンを順番に検証する
 */
 ASTreeNode* CMD()
 {
     /*
     ** 処理中のtokenのポインタをいったん保存する
     ** 解析のコマンドでcurtokを先に進めてしまうので、
-    ** 元の位置に戻れるようにするためだと思われる
+    ** 元の位置に戻れるようにするためにポインタを保持しておく
     */
     tok_t* save = curtok;
 
     ASTreeNode* node;
 
-    if ((curtok = save, node = CMD1()) != NULL) //	<simple command> '<' <filename>
+    if ((curtok = save /* ポインタを戻す */, node = CMD1()) != NULL) //	<simple command> '<' <filename>
         return node;
 
-    if ((curtok = save, node = CMD2()) != NULL) //	<simple command> '>' <filename>
+    if ((curtok = save /* ポインタを戻す */, node = CMD2()) != NULL) //	<simple command> '>' <filename>
         return node;
 
-    if ((curtok = save, node = CMD3()) != NULL) //	<simple command>
+    if ((curtok = save /* ポインタを戻す */, node = CMD3()) != NULL) //	<simple command>
         return node;
 
     return NULL;
@@ -457,10 +461,10 @@ ASTreeNode* CMD1()
         return NULL;
     }
 
-    result = malloc(sizeof(*result));
+    result = malloc(sizeof(*result)); /* ASTreeNode のポインタをメモリ確保 */
     ASTreeNodeSetType(result, NODE_REDIRECT_IN); /* filename からの入力を受け取るコマンドであることがわかるようにしておく */
-    ASTreeNodeSetData(result, filename);
-    ASTreeAttachBinaryBranch(result, NULL, simplecmdNode);
+    ASTreeNodeSetData(result, filename); /* resultのnodeに、テキストを保存する */
+    ASTreeAttachBinaryBranch(result, NULL, simplecmdNode); /* [left: NULL] --- [root: result(NODE_REDIRECT_IN)] --- [right: simplecmdNode] */
 
     return result;
 }
@@ -492,8 +496,8 @@ ASTreeNode* CMD2()
 
     result = malloc(sizeof(*result));
     ASTreeNodeSetType(result, NODE_REDIRECT_OUT); /* filename への出力を行うことがわかるようにしておく */
-    ASTreeNodeSetData(result, filename);
-	ASTreeAttachBinaryBranch(result, NULL, simplecmdNode);
+    ASTreeNodeSetData(result, filename);  /* resultのnodeに、テキストを保存する */
+	ASTreeAttachBinaryBranch(result, NULL, simplecmdNode); /* [left: NULL] --- [root: result(NODE_REDIRECT_OUT)] --- [right: simplecmdNode] */
 
     return result;
 }
@@ -505,22 +509,25 @@ ASTreeNode* CMD2()
 */
 ASTreeNode* CMD3()
 {
+    /* 残っているtoken が<simplecommand> に当てはまるかどうか */
     return SIMPLECMD();
 }
 
 /*
 ** SIMPLECMD():
-** 単純なコマンド形式の生成物を順番に検証する
+** CMD の検証を行う関数から呼び出される
+** <simplecommand> の構文パターンを順番に検証する
 */
 ASTreeNode* SIMPLECMD()
 {
     /*
     ** 処理中のtokenのポインタをいったん保存する
     ** 解析のコマンドでcurtokを先に進めてしまうので、
-    ** 元の位置に戻れるようにするためだと思われる
+    ** 元の位置に戻れるようにするためにポインタを保持しておく
     */
     tok_t* save = curtok;
 
+    /* <simplecommand> のパターンは一つしかない…ので、そのまま検証用の関数にわたす */
     return SIMPLECMD1(); // <pathname> <token list>
 }
 
@@ -540,34 +547,38 @@ ASTreeNode* SIMPLECMD1()
 
     tokenListNode = TOKENLIST();
     // we don't check whether tokenlistNode is NULL since its a valid grammer
+    /* tokenlistNodeは、NULLも正しい構文なので、エラーチェックしない */
+    /* 他の単位のときは、NULLだったらreturn NULLしている */
+    /* 例: if ((cmdNode = CMD()) == NULL) return (NULL); */
 
-    result = malloc(sizeof(*result));
+    result = malloc(sizeof(*result)); /* ASTreeNode のポインタをメモリ確保 */
     ASTreeNodeSetType(result, NODE_CMDPATH); /* 実行ファイルへのパスだとわかるようにしておく */
-    ASTreeNodeSetData(result, pathname);
-	ASTreeAttachBinaryBranch(result, NULL, tokenListNode);
+    ASTreeNodeSetData(result, pathname);  /* resultのnodeに、テキストを保存する */
+	ASTreeAttachBinaryBranch(result, NULL, tokenListNode); /* [left: NULL] --- [root: result(NODE_REDIRECT_IN)] --- [right: tokenListNode] */
 
     return result;
 }
 
 /*
 ** TOKENLIST():
-** トークンリスト生成物の検証を順番に行う
+** SIMPLECMDの検証を行う関数から呼び出される
+** <tokenlist>の構文パターンを順番に検証する
 */
 ASTreeNode* TOKENLIST()
 {
     /*
     ** 処理中のtokenのポインタをいったん保存する
     ** 解析のコマンドでcurtokを先に進めてしまうので、
-    ** 元の位置に戻れるようにするためだと思われる
+    ** 元の位置に戻れるようにするためにポインタを保持しておく
     */
     tok_t* save = curtok;
 
     ASTreeNode* node;
 
-    if ((curtok = save, node = TOKENLIST1()) != NULL) //	<token> <token list>
+    if ((curtok = save /* ポインタを戻す */, node = TOKENLIST1()) != NULL) //	<token> <token list>
         return node;
 
-    if ((curtok = save, node = TOKENLIST2()) != NULL) //	EMPTY
+    if ((curtok = save /* ポインタを戻す */, node = TOKENLIST2()) != NULL) //	EMPTY
         return node;
 
     return NULL;
@@ -591,10 +602,10 @@ ASTreeNode* TOKENLIST1()
     // we don't check whether tokenlistNode is NULL since its a valid grammer
     /* tokenListNodeがNULLである場合も有効な文法であるため、エラーとしてチェックしない */
 
-    result = malloc(sizeof(*result));
+    result = malloc(sizeof(*result)); /* ASTreeNode のポインタをメモリ確保 */
     ASTreeNodeSetType(result, NODE_ARGUMENT); /* 単独の引数としてノードタイプを設定 */
-    ASTreeNodeSetData(result, arg);
-	ASTreeAttachBinaryBranch(result, NULL, tokenListNode);
+    ASTreeNodeSetData(result, arg); /* resultのnodeに、テキストを保存する */
+	ASTreeAttachBinaryBranch(result, NULL, tokenListNode);  /* [left: NULL] --- [root: result(NODE_ARGUMENT)] --- [right: tokenListNode] */
 
     return result;
 }
@@ -606,7 +617,7 @@ ASTreeNode* TOKENLIST1()
 */
 ASTreeNode* TOKENLIST2()
 {
-    /* 順番に解析されていき、最終的にEMPTYになる…のだと思われ */
+    /* <tokenlist>が解析されていき、<token> の連なりに分解されたら、最終的にはEMPTYになる */
     return NULL;
 }
 
