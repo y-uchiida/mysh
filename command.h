@@ -5,17 +5,22 @@
 #include <stdbool.h>
 #include "astree.h"
 
+/*
+** CommandInternal:
+** execute_simple_command() などで利用される
+** ひとつのコマンドを実行するための周辺情報をまとめて保持する
+*/
 struct CommandInternal
 {
-	int argc;
-	char **argv;
-	bool stdin_pipe;
-	bool stdout_pipe;
-	int pipe_read;
-	int pipe_write;
-	char* redirect_in;
-	char* redirect_out;
-	bool asynchrnous;
+	int argc; /* 引数の数 */
+	char **argv; /* コマンドライン引数の文字列を保持するダブルポインタ */
+	bool stdin_pipe; /* 入力の指定ディスクリプタがあるか */
+	bool stdout_pipe; /* 出力の指定ディスクリプタがあるか */
+	int pipe_read; /* 入力ディスクリプタ番号 */
+	int pipe_write; /* 出力ディスクリプタ番号 */
+	char* redirect_in; /* 入力になるファイル名 */
+	char* redirect_out; /* 出力先のファイル名 */
+	bool asynchrnous; /* 同期的実行か、非同期的実行かの真偽値 */
 };
 
 typedef struct CommandInternal CommandInternal;

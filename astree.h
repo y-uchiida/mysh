@@ -27,7 +27,7 @@ typedef struct ASTreeNode
 
 /*
 ** NODETYPE(a):
-** a の
+** 抽象構文木のノードを受け取り、そのメンバtypeの値からNODE_TYPEを取得する
 */
 #define NODETYPE(a) (a & (~NODE_DATA))	// get the type of the nodes
 

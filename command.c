@@ -235,7 +235,12 @@ void execute_command_internal(CommandInternal* cmdinternal)
     return;
 }
 
-/* コマンド情報を初期化？ */
+/*
+** init_command_internal():
+** コマンド情報を取りまとめて設定する構造体 CommandInternal を、
+** 引数の内容で設定する
+** 実行コマンドの情報がすべて決定する execute_simple_command()で呼び出される
+*/
 int init_command_internal(ASTreeNode* simplecmdNode,
                           CommandInternal* cmdinternal,
                           bool async,
@@ -246,34 +251,39 @@ int init_command_internal(ASTreeNode* simplecmdNode,
                           char* redirect_in,
                           char* redirect_out)
 {
+    /* simplecmdNode の値がNULLもしくはtypeがNODE_CMDPATHではない場合、エラー */
     if (simplecmdNode == NULL || !(NODETYPE(simplecmdNode->type) == NODE_CMDPATH))
     {
         cmdinternal->argc = 0;
         return -1;
     }
 
+    /* 引数を取り出していくため、argNodeを設定 */
     ASTreeNode* argNode = simplecmdNode;
 
     int i = 0;
+    /* 引数の数をカウントするため、右の枝にNODE_ARGUMENTかNODE_CMDPATHがつづく数を数える */
     while (argNode != NULL && (NODETYPE(argNode->type) == NODE_ARGUMENT || NODETYPE(argNode->type) == NODE_CMDPATH)) {
         argNode = argNode->right;
         i++;
     }
 
+    /* カウントした分だけ、文字列ポインタを確保する。最後にNULLポインタをつけるので、数えた数よりひとつ多く確保しておく */
     cmdinternal->argv = (char**)malloc(sizeof(char*) * (i + 1));
-    argNode = simplecmdNode;
-    i = 0;
+    argNode = simplecmdNode; /* argNodeを巻き戻し */
+    i = 0; /* 引数文字列の数をカウント。最後にargcになる */
     while (argNode != NULL && (NODETYPE(argNode->type) == NODE_ARGUMENT || NODETYPE(argNode->type) == NODE_CMDPATH)) {
         cmdinternal->argv[i] = (char*)malloc(strlen(argNode->szData) + 1);
-        strcpy(cmdinternal->argv[i], argNode->szData);
+        strcpy(cmdinternal->argv[i], argNode->szData); /* 各ノードの文字列データを複製する */
 
-        argNode = argNode->right;
+        argNode = argNode->right; /* 次のノードへ進む */
         i++;
     }
 
-    cmdinternal->argv[i] = NULL;
+    cmdinternal->argv[i] = NULL; /* 引数文字列の末尾ポインタをNULLに設定 */
     cmdinternal->argc = i;
 
+    /* 引数として渡された値をそのままcmdinternalに保存する */
     cmdinternal->asynchrnous = async;
     cmdinternal->stdin_pipe = stdin_pipe;
     cmdinternal->stdout_pipe = stdout_pipe;
