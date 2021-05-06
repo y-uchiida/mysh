@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <sys/signal.h>
 #include <pwd.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -27,7 +29,11 @@ char* getprompt()
 	return prompt;
 }
 
-void ignore_signal_for_shell() /* シェル自身に対するシグナルハンドラを設定 */
+/* ignore_signal_for_shell()で、myshell プロセスに対して送信されたシグナルのハンドラを設定している
+** mysh プロセスに対するシグナルハンドラの設定が済んでいることを示すため、
+** グローバル変数 signalsetを利用している
+*/
+void ignore_signal_for_shell()
 {
 	signalset = true;
 	
@@ -41,7 +47,15 @@ void ignore_signal_for_shell() /* シェル自身に対するシグナルハン�
     signal(SIGQUIT, SIG_IGN);
 }
 
-// restore Ctrl-C signal in the child process
+/*
+** ignore_sigint_in_childは、子プロセス(つまり、外部コマンドを実行するためにforkされたプロセス)へ
+** SIGINTシグナルが送られたときのハンドラを設定している
+** 分岐元のmysh プロセスは、ignore_sitnal_for_shell() 関数の実行により
+** SIGINT シグナルを無視するように設定されているため、ここから派生したコマンド実行プロセスも
+** そのままではSIGINTを無視してしまう
+** そこで、signalsetフラグがtrue (== SIGINTを無視するように設定済み)の場合は、
+** SIGINTのシグナルハンドラー関数を再設定している
+*/
 void restore_sigint_in_child()
 {
 	if (signalset)
@@ -64,7 +78,7 @@ void execute_cd(CommandInternal* cmdinternal)
     }
 }
 
-// built-in command prompt
+// built-in command prompt /* 組み込みコマンド prompt */
 void execute_prompt(CommandInternal* cmdinternal)
 {
     if (cmdinternal->argc == 1)
@@ -76,7 +90,7 @@ void execute_prompt(CommandInternal* cmdinternal)
     }
 }
 
-// built-in command pwd
+// built-in command pwd /* 組み込みコマンド pwd */
 void execute_pwd(CommandInternal* cmdinternal)
 {
     pid_t pid;
@@ -134,7 +148,7 @@ void execute_command_internal(CommandInternal* cmdinternal)
     if (cmdinternal->argc < 0)
         return;
 
-    // check for built-in commands
+    // check for built-in commands /* 組み込みコマンドの実行 */
     if (strcmp(cmdinternal->argv[0], "cd") == 0) {
         execute_cd(cmdinternal);
         return;
@@ -153,14 +167,17 @@ void execute_command_internal(CommandInternal* cmdinternal)
     pid_t pid;
     if((pid = fork()) == 0 ) {
 		// restore the signals in the child process
+        /* -> 子プロセスのシグナルを復元する */
 		restore_sigint_in_child();
 		
 		// store the stdout file desc
+        /* 出力先のファイルディスクリプタを格納 */
         int stdoutfd = dup(STDOUT_FILENO);
 
 		// for bckgrnd jobs redirect stdin from /dev/null
+        /* -> バックグラウンド処理のジョブの場合、標準入力をdev/null からリダイレクトする */
         if (cmdinternal->asynchrnous) {
-            int fd = open("/dev/null",O_RDWR);
+            int fd = open("/dev/null", O_RDWR);
             if (fd == -1) {
                 perror("/dev/null");
                 exit(1);
@@ -169,6 +186,7 @@ void execute_command_internal(CommandInternal* cmdinternal)
         }
 
         // redirect stdin from file if specified
+        /* -> ファイルディスクリプタが指定されていた場合、標準入力をそのファイルからリダイレクトする */
         if (cmdinternal->redirect_in) {
             int fd = open(cmdinternal->redirect_in, O_RDONLY);
             if (fd == -1) {
@@ -180,6 +198,7 @@ void execute_command_internal(CommandInternal* cmdinternal)
         }
 
         // redirect stdout to file if specified
+        /* -> ファイルの指定がある場合、標準出力をファイルにリダイレクト */
         else if (cmdinternal->redirect_out) {
             int fd = open(cmdinternal->redirect_out, O_WRONLY | O_CREAT | O_TRUNC,
                           S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -192,21 +211,23 @@ void execute_command_internal(CommandInternal* cmdinternal)
         }
 
         // read stdin from pipe if present
+        /* -> 標準入力があれば、パイプから読み込む */
         if (cmdinternal->stdin_pipe)
             dup2(cmdinternal->pipe_read, STDIN_FILENO);
 
 		// write stdout to pipe if present
+        /* -> 標準出力があれば、パイプに書き込む */
         if (cmdinternal->stdout_pipe)
             dup2(cmdinternal->pipe_write, STDOUT_FILENO);
 
         if (execvp(cmdinternal->argv[0], cmdinternal->argv) == -1) {
 			// restore the stdout for displaying error message
+            /* -> エラーメッセージを表示するための、標準出力の復元 */
             dup2(stdoutfd, STDOUT_FILENO);
 			
             printf("Command not found: \'%s\'\n", cmdinternal->argv[0]);
 			exit(1);
         }
-
         
     }
     else if (pid < 0) {
@@ -217,11 +238,13 @@ void execute_command_internal(CommandInternal* cmdinternal)
     if (!cmdinternal->asynchrnous)
     {
         // wait till the process has not finished
+        /* -> プロセスが終了していない状態で待つ */
         while (waitpid(pid, NULL, 0) <= 0);
     }
     else
     {
 		// set the sigchild handler for the spawned process
+        /* -> 起動したプロセスのシグナルIDのハンドラを設定する */
         printf("%d started\n", pid);
         struct sigaction act;
         act.sa_flags = 0;

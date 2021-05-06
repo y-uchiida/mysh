@@ -21,17 +21,17 @@ void execute_simple_command(ASTreeNode* simple_cmd_node,
                             )
 {
 
-    printf("\t - execute_simple_commnad here.\n");
-    printf("\t - NODE_TYPE(simple_cmd_node->type): %d\n", NODETYPE(simple_cmd_node->type));
-    printf("\t - simple_cmd_node->szData: %s\n", simple_cmd_node->szData);
+    // printf("\t - execute_simple_commnad here.\n");
+    // printf("\t - NODE_TYPE(simple_cmd_node->type): %d\n", NODETYPE(simple_cmd_node->type));
+    // printf("\t - simple_cmd_node->szData: %s\n", simple_cmd_node->szData);
 
-    if (simple_cmd_node->right != NULL)
-    {
-        printf("\t - NODE_TYPE(simple_cmd_node->right->type): %d\n", NODETYPE(simple_cmd_node->right->type));
-        printf("\t - simple_cmd_node->right->szData: %s\n", simple_cmd_node->right->szData);
+    // if (simple_cmd_node->right != NULL)
+    // {
+    //     printf("\t - NODE_TYPE(simple_cmd_node->right->type): %d\n", NODETYPE(simple_cmd_node->right->type));
+    //     printf("\t - simple_cmd_node->right->szData: %s\n", simple_cmd_node->right->szData);
 
-    }
-    printf("\n");
+    // }
+    // printf("\n");
 
     CommandInternal cmdinternal;
     init_command_internal(simple_cmd_node, &cmdinternal, async, stdin_pipe, stdout_pipe,
@@ -58,10 +58,10 @@ void execute_command(ASTreeNode* cmdNode,
     if (cmdNode == NULL)
         return;
 
-    printf("\t - execute_command here.\n");
-    printf("\t - NODE_TYPE(cmdNode->type): %d\n", NODETYPE(cmdNode->type));
-    printf("\t - cmdNode->szData: %s\n", cmdNode->szData);
-    printf("\n");
+    // printf("\t - execute_command here.\n");
+    // printf("\t - NODE_TYPE(cmdNode->type): %d\n", NODETYPE(cmdNode->type));
+    // printf("\t - cmdNode->szData: %s\n", cmdNode->szData);
+    // printf("\n");
 
     switch (NODETYPE(cmdNode->type)) /* NODETYPEにより分岐 */
     {
@@ -108,9 +108,9 @@ void execute_pipeline(ASTreeNode* t, bool async)
 {
     int file_desc[2];
 
-    printf("\t - execute_pipeline here.\n");
-    printf("\t - NODETYPE(t->type): %d\n", NODETYPE(t->type));
-    printf("\t - t->szData: %s\n", t->szData);
+    // printf("\t - execute_pipeline here.\n");
+    // printf("\t - NODETYPE(t->type): %d\n", NODETYPE(t->type));
+    // printf("\t - t->szData: %s\n", t->szData);
 
     pipe(file_desc);
     int pipewrite = file_desc[1];
@@ -121,9 +121,9 @@ void execute_pipeline(ASTreeNode* t, bool async)
     execute_command(t->left, async, false, true, 0, pipewrite);
     ASTreeNode* jobNode = t->right;
 
-    printf("\t - NODETYPE(jobNode->type): %d\n", NODETYPE(jobNode->type));
-    printf("\t - jobNode->szData: %s\n", jobNode->szData);
-    printf("\n");
+    // printf("\t - NODETYPE(jobNode->type): %d\n", NODETYPE(jobNode->type));
+    // printf("\t - jobNode->szData: %s\n", jobNode->szData);
+    // printf("\n");
 
     /*  多重パイプの処理 ... typeにNODE_PIPEが設定されている間は繰り返し */
     while (jobNode != NULL && NODETYPE(jobNode->type) == NODE_PIPE)
@@ -160,10 +160,10 @@ void execute_job(ASTreeNode* jobNode, bool async)
     if (jobNode == NULL)
         return;
 
-    printf("\t - execute_job here.\n");
-    printf("\t - NODETYPE(jobNode->type): %d\n", NODETYPE(jobNode->type));
-    printf("\t - jobNode->szData: %s\n", jobNode->szData);
-    printf("\n");
+    // printf("\t - execute_job here.\n");
+    // printf("\t - NODETYPE(jobNode->type): %d\n", NODETYPE(jobNode->type));
+    // printf("\t - jobNode->szData: %s\n", jobNode->szData);
+    // printf("\n");
 
     switch (NODETYPE(jobNode->type))
     {
@@ -188,10 +188,10 @@ void execute_cmdline(ASTreeNode* cmdline)
     if (cmdline == NULL)
         return;
 
-    printf("\t - execute_cmdline here.\n");
-    printf("\t - NODETYPE(cmdline->type): %d\n", NODETYPE(cmdline->type));
-    printf("\t - cmdline->szData: %s\n", cmdline->szData);
-    printf("\n");
+    // printf("\t - execute_cmdline here.\n");
+    // printf("\t - NODETYPE(cmdline->type): %d\n", NODETYPE(cmdline->type));
+    // printf("\t - cmdline->szData: %s\n", cmdline->szData);
+    // printf("\n");
 
     switch(NODETYPE(cmdline->type)) /* NODETYPEによって処理を振り分ける */
     {

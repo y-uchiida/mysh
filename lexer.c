@@ -146,7 +146,7 @@ int lexer_build(char* input, int size, lexer_t* lexerbuf)
 	
 	lexerbuf->llisttok = malloc(sizeof(tok_t)); /* 最初のtokenを入れるポインタを作成 */
 	
-	/* 最初のtokenを確保する？ */
+	/* リストの先頭になるtokenポインタを確保する */
 	// allocate the first token
 	tok_t* token = lexerbuf->llisttok; /* トークンの連結リストのポインタを代入 */
 	tok_init(token, size);
@@ -262,7 +262,7 @@ int lexer_build(char* input, int size, lexer_t* lexerbuf)
 			glob_t globbuf;
 			glob(token->data, GLOB_TILDE, NULL, &globbuf);
 			
-			show_globbuf(globbuf);
+			// show_globbuf(globbuf);
 
 			if (globbuf.gl_pathc > 0)
 			{
