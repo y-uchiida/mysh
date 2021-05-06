@@ -28,10 +28,10 @@ void show_lexerlist(tok_t *tokens)
 
 int main()
 {
-	// ignore Ctrl-\ Ctrl-C Ctrl-Z signals
-	ignore_signal_for_shell(); /* シグナルの取得をする */
+	/* shell プロセスのシグナルハンドラを設定する */
+	ignore_signal_for_shell();
 
-	// set the prompt
+	// プロンプト文字を表示
 	set_prompt("swoorup % ");
 
 	while (1)
@@ -69,18 +69,17 @@ int main()
 			** EINTR: Interrupted system call
 			*/
 			if (nread <= 0 && errno == EINTR) {
-				again = 1;        	// signal interruption, read again
+				again = 1;        	// ループ用のフラグを立て直し
 				clearerr(stdin);	// clear the error
 			}
 		}
 
-		// user pressed ctrl-D
+		// Ctrl ⁺ D　が押され、キーボードから入力終了文字(EOF)が送信されたらshell プロセスを終了する
 		if (feof(stdin)) {
 			exit(0);
 			return 0;
 		}
 		
-		// lexically analyze and build a list of tokens
 		lexer_build(linebuffer, len, &lexerbuf); /* 字句解析を行い、トークン一覧を作成する */
 		free(linebuffer);
 
